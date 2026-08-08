@@ -21,6 +21,8 @@ Relay is a full-stack, one-to-one messaging prototype built for the Associate Ba
 - Mark incoming messages as read when a conversation is opened
 - User list ordered by latest conversation activity
 - New users appear in connected clients automatically
+- Online/offline presence indicators
+- Automatic access-token renewal using the refresh token
 
 ## Prerequisites
 
@@ -78,9 +80,13 @@ DB_HOST=127.0.0.1
 DB_PORT=5432
 BACKEND_PORT=8000
 SOCKET_PORT=8000
+CHANNEL_LAYER_BACKEND=inmemory
+REDIS_URL=redis://127.0.0.1:6379/0
 ```
 
 `SOCKET_PORT` is also `8000` because Django Channels serves REST API and WebSocket traffic through the same ASGI/Daphne server.
+
+For this machine task, keep `CHANNEL_LAYER_BACKEND=inmemory`; it needs no Redis installation. For a multi-worker deployment, install Redis and change it to `redis`, so Channels can share WebSocket groups across server processes.
 
 ### Frontend
 
@@ -149,6 +155,7 @@ Authorization: Bearer <access-token>
 |---|---|---|
 | POST | `/api/auth/register` | Register a user. Body: `username`, `email`, `password`. |
 | POST | `/api/auth/login` | Log in and receive JWT access/refresh tokens. |
+| POST | `/api/auth/refresh` | Exchange a valid refresh token for a new access token. |
 | GET | `/api/users` | List other users with unread message counts. |
 | GET | `/api/messages/:otherUserId` | Get chronological one-to-one history. |
 | PATCH | `/api/messages/:otherUserId/read` | Mark incoming messages from that user as read. |

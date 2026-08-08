@@ -2,13 +2,15 @@ import { useEffect, useRef } from 'react';
 
 const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL || 'ws://127.0.0.1:8000/ws/chat/';
 
-export function useChatSocket(token, onEvent) {
+export function useChatSocket(token, onEvent, onUnauthorized) {
   const socketRef = useRef(null);
   const eventHandlerRef = useRef(onEvent);
+  const unauthorizedHandlerRef = useRef(onUnauthorized);
 
   useEffect(() => { eventHandlerRef.current = onEvent; }, [onEvent]);
+  useEffect(() => { unauthorizedHandlerRef.current = onUnauthorized; }, [onUnauthorized]);
 
-  useEffect(    () => {
+  useEffect(() => {
     if (!token) return undefined;
     let reconnectTimer;
     let intentionallyClosed = false;
@@ -17,7 +19,11 @@ export function useChatSocket(token, onEvent) {
       const socket = new WebSocket(`${WS_BASE_URL}?token=${encodeURIComponent(token)}`);
       socketRef.current = socket;
       socket.onmessage = ({ data }) => eventHandlerRef.current(JSON.parse(data));
-      socket.onclose = () => {
+      socket.onclose = ({ code }) => {
+        if (code === 4401) {
+          Promise.resolve(unauthorizedHandlerRef.current?.()).catch(() => {});
+          return;
+        }
         if (!intentionallyClosed && localStorage.getItem('relay_token') === token) {
           reconnectTimer = setTimeout(connect, 2500);
         }

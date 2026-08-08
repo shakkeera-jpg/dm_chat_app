@@ -1,6 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
-import { apiRequest } from '../api/client';
 import { useChatSocket } from '../hooks/useChatSocket';
 import { useAuth } from './AuthContext';
 
@@ -11,7 +10,7 @@ const moveUserToTop = (people, userId) => {
 };
 
 export function ChatProvider({ children }) {
-  const { token, currentUser } = useAuth();
+  const { token, currentUser, logout, refreshAccessToken, authenticatedRequest } = useAuth();
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -30,9 +29,17 @@ export function ChatProvider({ children }) {
     setTimeout(() => setToasts((items) => items.filter((item) => item.id !== id)), 4000);
   }, []);
 
+  const handleApiError = useCallback((error) => {
+    if (error.status === 401) {
+      logout();
+      return;
+    }
+    showToast(error.message);
+  }, [logout, showToast]);
+
   const loadUsers = useCallback(async () => {
-    if (token) setUsers(await apiRequest('/users', token));
-  }, [token]);
+    if (token) setUsers(await authenticatedRequest('/users'));
+  }, [token, authenticatedRequest]);
 
   const handleSocketEvent = useCallback(async (event) => {
     const message = event.message;
@@ -46,37 +53,42 @@ export function ChatProvider({ children }) {
     if (event.type === 'private_message' && selectedUserRef.current?.id === message.sender_id) {
       setMessages((items) => [...items, message]);
       setUsers((items) => moveUserToTop(items, message.sender_id));
-      await apiRequest(`/messages/${message.sender_id}/read`, token, { method: 'PATCH' });
+      try { await authenticatedRequest(`/messages/${message.sender_id}/read`, { method: 'PATCH' }); }
+      catch (error) { handleApiError(error); }
     }
     if (event.type === 'new_message_notification') {
       setUsers((items) => moveUserToTop(items.map((item) => item.id === message.sender_id ? { ...item, unread_count: item.unread_count + 1 } : item), message.sender_id));
       showToast(`New message: ${message.text_content}`);
     }
     if (event.type === 'user_registered') await loadUsers();
+    if (event.type === 'presence_update') {
+      setUsers((items) => items.map((item) => item.id === event.user_id ? { ...item, is_online: event.is_online } : item));
+      setSelectedUser((user) => user?.id === event.user_id ? { ...user, is_online: event.is_online } : user);
+    }
     if (event.type === 'typing_status') setTyping(event.is_typing);
     if (event.type === 'error') {
       setIsSending(false);
       showToast(event.detail);
     }
-  }, [loadUsers, showToast, token]);
+  }, [authenticatedRequest, handleApiError, loadUsers, showToast]);
 
-  const { send } = useChatSocket(token, handleSocketEvent);
+  const { send } = useChatSocket(token, handleSocketEvent, refreshAccessToken);
 
   useEffect(() => {
     if (!token || !currentUser) {
       setUsers([]); setSelectedUser(null); setMessages([]); setDraft(''); setIsSending(false);
       return;
     }
-    loadUsers().catch((error) => showToast(error.message));
-  }, [token, currentUser, loadUsers, showToast]);
+    loadUsers().catch(handleApiError);
+  }, [token, currentUser, loadUsers, handleApiError]);
 
   async function selectUser(person) {
     setSelectedUser(person); setTyping(false); send({ type: 'set_active_chat', other_user_id: person.id });
     try {
-      setMessages(await apiRequest(`/messages/${person.id}`, token));
-      await apiRequest(`/messages/${person.id}/read`, token, { method: 'PATCH' });
+      setMessages(await authenticatedRequest(`/messages/${person.id}`));
+      await authenticatedRequest(`/messages/${person.id}/read`, { method: 'PATCH' });
       setUsers((items) => items.map((item) => item.id === person.id ? { ...item, unread_count: 0 } : item));
-    } catch (error) { showToast(error.message); }
+    } catch (error) { handleApiError(error); }
   }
 
   function sendMessage(event) {
@@ -94,8 +106,10 @@ export function ChatProvider({ children }) {
   function changeDraft(value) {
     setDraft(value);
     if (!selectedUser) return;
-    send({ type: 'typing_status', recipient_id: selectedUser.id, is_typing: true });
     clearTimeout(typingTimer.current);
+    const isTyping = Boolean(value.trim());
+    send({ type: 'typing_status', recipient_id: selectedUser.id, is_typing: isTyping });
+    if (!isTyping) return;
     typingTimer.current = setTimeout(() => send({ type: 'typing_status', recipient_id: selectedUser.id, is_typing: false }), 700);
   }
 

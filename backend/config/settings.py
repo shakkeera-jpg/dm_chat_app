@@ -87,7 +87,20 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.IsAuthenticated',),
 }
 SIMPLE_JWT = {'ACCESS_TOKEN_LIFETIME': timedelta(hours=8)}
-CHANNEL_LAYERS = {'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'}}
+
+# In-memory Channels is ideal for local development. Set
+# CHANNEL_LAYER_BACKEND=redis with a Redis URL when deploying multiple ASGI
+# workers so WebSocket groups are shared across processes.
+CHANNEL_LAYER_BACKEND = os.getenv('CHANNEL_LAYER_BACKEND', 'inmemory').lower()
+if CHANNEL_LAYER_BACKEND == 'redis':
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {'hosts': [os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/0')]},
+        }
+    }
+else:
+    CHANNEL_LAYERS = {'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'}}
 
 
 # Database

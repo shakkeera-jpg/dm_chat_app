@@ -1,4 +1,5 @@
 import json
+from collections import defaultdict
 
 from asgiref.sync import sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -12,6 +13,10 @@ from .models import Message
 class ChatConsumer(AsyncWebsocketConsumer):
     """Authenticated WebSocket for private messages, notifications and typing."""
 
+    # This local prototype uses Django's in-memory channel layer, so a process-local
+    # connection count accurately handles multiple tabs for the same user.
+    online_connections = defaultdict(set)
+
     async def connect(self):
         token = self._query_value('token')
         try:
@@ -23,14 +28,22 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         self.active_chat_id = None
         self.group_name = f'user_{self.user.id}'
+        was_offline = not self.online_connections[self.user.id]
+        self.online_connections[self.user.id].add(self.channel_name)
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.channel_layer.group_add('online_users', self.channel_name)
         await self.accept()
+        if was_offline:
+            await self._update_presence(True)
 
     async def disconnect(self, close_code):
         if hasattr(self, 'group_name'):
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
             await self.channel_layer.group_discard('online_users', self.channel_name)
+            self.online_connections[self.user.id].discard(self.channel_name)
+            if not self.online_connections[self.user.id]:
+                self.online_connections.pop(self.user.id, None)
+                await self._update_presence(False)
 
     async def receive(self, text_data):
         try:
@@ -88,6 +101,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def user_registered(self, event):
         await self.send(text_data=json.dumps({'type': 'user_registered', 'user': event['user']}))
 
+    async def presence_update(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'presence_update',
+            'user_id': event['user_id'],
+            'is_online': event['is_online'],
+        }))
+
     async def _error(self, detail):
         await self.send(text_data=json.dumps({'type': 'error', 'detail': detail}))
 
@@ -108,3 +128,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @sync_to_async
     def _message_payload(self, message):
         return {'id': message.id, 'sender_id': message.sender_id, 'recipient_id': message.recipient_id, 'text_content': message.text_content, 'is_read': message.is_read, 'created_at': message.created_at.isoformat()}
+
+    async def _update_presence(self, is_online):
+        await sync_to_async(User.objects.filter(id=self.user.id).update)(is_online=is_online)
+        await self.channel_layer.group_send('online_users', {
+            'type': 'presence_update',
+            'user_id': self.user.id,
+            'is_online': is_online,
+        })
