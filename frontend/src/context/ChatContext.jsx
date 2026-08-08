@@ -16,6 +16,7 @@ export function ChatProvider({ children }) {
   const [selectedUser, setSelectedUser] = useState(null);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
+  const [isSending, setIsSending] = useState(false);
   const [typing, setTyping] = useState(false);
   const [toasts, setToasts] = useState([]);
   const selectedUserRef = useRef(null);
@@ -35,9 +36,12 @@ export function ChatProvider({ children }) {
 
   const handleSocketEvent = useCallback(async (event) => {
     const message = event.message;
-    if (event.type === 'message_sent' && selectedUserRef.current?.id === message.recipient_id) {
-      setMessages((items) => [...items, message]);
-      setUsers((items) => moveUserToTop(items, message.recipient_id));
+    if (event.type === 'message_sent') {
+      setIsSending(false);
+      if (selectedUserRef.current?.id === message.recipient_id) {
+        setMessages((items) => [...items, message]);
+        setUsers((items) => moveUserToTop(items, message.recipient_id));
+      }
     }
     if (event.type === 'private_message' && selectedUserRef.current?.id === message.sender_id) {
       setMessages((items) => [...items, message]);
@@ -50,14 +54,17 @@ export function ChatProvider({ children }) {
     }
     if (event.type === 'user_registered') await loadUsers();
     if (event.type === 'typing_status') setTyping(event.is_typing);
-    if (event.type === 'error') showToast(event.detail);
+    if (event.type === 'error') {
+      setIsSending(false);
+      showToast(event.detail);
+    }
   }, [loadUsers, showToast, token]);
 
   const { send } = useChatSocket(token, handleSocketEvent);
 
   useEffect(() => {
     if (!token || !currentUser) {
-      setUsers([]); setSelectedUser(null); setMessages([]); setDraft('');
+      setUsers([]); setSelectedUser(null); setMessages([]); setDraft(''); setIsSending(false);
       return;
     }
     loadUsers().catch((error) => showToast(error.message));
@@ -74,8 +81,14 @@ export function ChatProvider({ children }) {
 
   function sendMessage(event) {
     event.preventDefault();
-    if (!draft.trim() || !selectedUser) return;
-    if (send({ type: 'send_private_message', recipient_id: selectedUser.id, text_content: draft.trim() })) setDraft('');
+    if (!draft.trim() || !selectedUser || isSending) return;
+    setIsSending(true);
+    if (send({ type: 'send_private_message', recipient_id: selectedUser.id, text_content: draft.trim() })) {
+      setDraft('');
+    } else {
+      setIsSending(false);
+      showToast('Connection is unavailable. Please try again.');
+    }
   }
 
   function changeDraft(value) {
@@ -86,7 +99,7 @@ export function ChatProvider({ children }) {
     typingTimer.current = setTimeout(() => send({ type: 'typing_status', recipient_id: selectedUser.id, is_typing: false }), 700);
   }
 
-  return <ChatContext.Provider value={{ users, selectedUser, messages, draft, typing, toasts, selectUser, sendMessage, changeDraft }}>{children}</ChatContext.Provider>;
+  return <ChatContext.Provider value={{ users, selectedUser, messages, draft, isSending, typing, toasts, selectUser, sendMessage, changeDraft }}>{children}</ChatContext.Provider>;
 }
 
 export function useChat() {

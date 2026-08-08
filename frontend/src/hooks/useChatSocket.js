@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-const WS_BASE_URL = 'ws://127.0.0.1:8000/ws/chat/';
+const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL || 'ws://127.0.0.1:8000/ws/chat/';
 
 export function useChatSocket(token, onEvent) {
   const socketRef = useRef(null);

@@ -5,5 +5,6 @@ backend/venv/
 backend/.git-backup/
 frontend/node_modules/
 frontend/dist/
+frontend/.env
 **/__pycache__/
 *.py[cod]

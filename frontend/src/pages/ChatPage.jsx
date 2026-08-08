@@ -14,7 +14,7 @@ export default function ChatPage() {
   return (
     <main className="chat-shell">
       <PeopleSidebar currentUser={currentUser} users={chat.users} selectedUser={chat.selectedUser} onSelectUser={chat.selectUser} onLogout={logout} />
-      <ChatWindow currentUser={currentUser} selectedUser={chat.selectedUser} messages={chat.messages} draft={chat.draft} typing={chat.typing} onDraftChange={chat.changeDraft} onSendMessage={chat.sendMessage} />
+      <ChatWindow currentUser={currentUser} selectedUser={chat.selectedUser} messages={chat.messages} draft={chat.draft} isSending={chat.isSending} typing={chat.typing} onDraftChange={chat.changeDraft} onSendMessage={chat.sendMessage} />
       <ToastContainer toasts={chat.toasts} />
     </main>
   );

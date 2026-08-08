@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-export default function ChatWindow({ currentUser, selectedUser, messages, draft, typing, onDraftChange, onSendMessage }) {
+export default function ChatWindow({ currentUser, selectedUser, messages, draft, isSending, typing, onDraftChange, onSendMessage }) {
   const listRef = useRef(null);
   useEffect(() => { listRef.current?.scrollTo(0, listRef.current.scrollHeight); }, [messages]);
 
@@ -14,7 +14,7 @@ export default function ChatWindow({ currentUser, selectedUser, messages, draft,
         </div>
         <form id="message-form" onSubmit={onSendMessage}>
           <input value={draft} onChange={(event) => onDraftChange(event.target.value)} placeholder="Write a message..." maxLength="2000" autoComplete="off" />
-          <button disabled={!draft.trim()}>Send</button>
+          <button disabled={!draft.trim() || isSending}>{isSending ? 'Sending...' : 'Send'}</button>
         </form>
       </div>
     </section>
