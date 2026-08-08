@@ -7,7 +7,7 @@ Relay is a full-stack, one-to-one messaging prototype built for the Associate Ba
 - Backend: Python, Django, Django REST Framework, Django Channels, Daphne
 - Database: PostgreSQL
 - Authentication: JWT using `djangorestframework-simplejwt`
-- Frontend: React, Vite, React Router
+- Frontend: React, Vite, React Router, Tailwind CSS
 - Real-time communication: WebSockets via Django Channels
 
 ## Features
@@ -18,6 +18,8 @@ Relay is a full-stack, one-to-one messaging prototype built for the Associate Ba
 - Live private messages without page refresh
 - Typing indicator for the active conversation
 - Live unread badges and toast notifications for unselected conversations
+- iOS-inspired responsive interface styled with Tailwind CSS utilities
+- WhatsApp-style notification banner showing the sender and message preview
 - Mark incoming messages as read when a conversation is opened
 - User list ordered by latest conversation activity
 - New users appear in connected clients automatically
@@ -104,6 +106,12 @@ VITE_WS_BASE_URL=ws://127.0.0.1:8000/ws/chat/
 VITE_PORT=5173
 ```
 
+### Frontend styling
+
+The UI is styled with **Tailwind CSS v4** through the Vite plugin. Component styles are kept close to their JSX as Tailwind utility classes, making each component self-contained and responsive without a separate large stylesheet.
+
+`frontend/src/index.css` is intentionally small: it imports Tailwind and contains only global defaults and the toast animation. The previous `styles.css` file is no longer used.
+
 ## Run locally
 
 Use two terminals from the project root.
@@ -139,7 +147,7 @@ If PowerShell blocks `npm`, use `npm.cmd run dev` instead.
 2. Open the frontend in one normal browser window and one Incognito/private window. Separate sessions are required because normal tabs share browser storage.
 3. Register two different accounts.
 4. Send a message from User A to User B.
-5. With User B viewing a different conversation, confirm that User B receives a toast and an unread badge.
+5. With User B viewing a different conversation, confirm that User B receives an unread badge and an iOS/WhatsApp-style toast showing User A's name with a message preview.
 6. Open User A's conversation as User B. The badge should reset and the conversation history should be visible.
 7. Type a message to verify the typing indicator.
 

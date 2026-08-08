@@ -19,13 +19,15 @@ export function ChatProvider({ children }) {
   const [typing, setTyping] = useState(false);
   const [toasts, setToasts] = useState([]);
   const selectedUserRef = useRef(null);
+  const usersRef = useRef([]);
   const typingTimer = useRef(null);
 
   useEffect(() => { selectedUserRef.current = selectedUser; }, [selectedUser]);
+  useEffect(() => { usersRef.current = users; }, [users]);
 
-  const showToast = useCallback((text) => {
+  const showToast = useCallback((text, title = 'Relay') => {
     const id = crypto.randomUUID();
-    setToasts((items) => [...items, { id, text }]);
+    setToasts((items) => [...items, { id, title, text }]);
     setTimeout(() => setToasts((items) => items.filter((item) => item.id !== id)), 4000);
   }, []);
 
@@ -57,8 +59,9 @@ export function ChatProvider({ children }) {
       catch (error) { handleApiError(error); }
     }
     if (event.type === 'new_message_notification') {
+      const sender = usersRef.current.find((item) => item.id === message.sender_id);
       setUsers((items) => moveUserToTop(items.map((item) => item.id === message.sender_id ? { ...item, unread_count: item.unread_count + 1 } : item), message.sender_id));
-      showToast(`New message: ${message.text_content}`);
+      showToast(message.text_content, sender?.username || 'a user');
     }
     if (event.type === 'user_registered') await loadUsers();
     if (event.type === 'presence_update') {
@@ -91,6 +94,15 @@ export function ChatProvider({ children }) {
     } catch (error) { handleApiError(error); }
   }
 
+  function closeConversation() {
+    if (selectedUser) send({ type: 'typing_status', recipient_id: selectedUser.id, is_typing: false });
+    clearTimeout(typingTimer.current);
+    setSelectedUser(null);
+    setMessages([]);
+    setTyping(false);
+    setDraft('');
+  }
+
   function sendMessage(event) {
     event.preventDefault();
     if (!draft.trim() || !selectedUser || isSending) return;
@@ -113,7 +125,7 @@ export function ChatProvider({ children }) {
     typingTimer.current = setTimeout(() => send({ type: 'typing_status', recipient_id: selectedUser.id, is_typing: false }), 700);
   }
 
-  return <ChatContext.Provider value={{ users, selectedUser, messages, draft, isSending, typing, toasts, selectUser, sendMessage, changeDraft }}>{children}</ChatContext.Provider>;
+  return <ChatContext.Provider value={{ users, selectedUser, messages, draft, isSending, typing, toasts, selectUser, closeConversation, sendMessage, changeDraft }}>{children}</ChatContext.Provider>;
 }
 
 export function useChat() {
