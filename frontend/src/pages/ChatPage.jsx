@@ -13,7 +13,7 @@ export default function ChatPage() {
 
   return (
     <main className="flex h-dvh flex-col overflow-hidden bg-white md:grid md:grid-cols-[300px_minmax(0,1fr)]">
-      <div className={chat.selectedUser ? 'hidden md:block' : 'block'}><PeopleSidebar currentUser={currentUser} users={chat.users} selectedUser={chat.selectedUser} onSelectUser={chat.selectUser} onLogout={logout} /></div>
+      <div className={chat.selectedUser ? 'hidden md:block md:h-full' : 'block md:h-full'}><PeopleSidebar currentUser={currentUser} users={chat.users} selectedUser={chat.selectedUser} onSelectUser={chat.selectUser} onLogout={logout} /></div>
       <div className={chat.selectedUser ? 'flex min-h-0 flex-1 md:flex' : 'hidden md:flex'}><ChatWindow currentUser={currentUser} selectedUser={chat.selectedUser} messages={chat.messages} draft={chat.draft} isSending={chat.isSending} typing={chat.typing} onDraftChange={chat.changeDraft} onSendMessage={chat.sendMessage} onClose={chat.closeConversation} /></div>
       <ToastContainer toasts={chat.toasts} />
     </main>
